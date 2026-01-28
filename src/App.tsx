@@ -43,11 +43,11 @@ function genRequestId(): string {
 // STAGE 5 CONVERSION — single source of truth for the app destination
 const FINAL_APP_URL = "https://app.balancecipher.info/";
 
-// CRM relay route (App Router)
-const RELAY_ROUTE = "/api/submit-application";
+// ✅ CRM relay route (Vercel Serverless Function at /api/applications.js)
+const RELAY_ROUTE = "/api/applications";
 
 // Canon source for this funnel
-const CRM_SOURCE = "balance-cypher-v2";
+const CRM_SOURCE = "balance-cypher-v2-clean";
 
 // Canon payload shape expected by CRM
 type CrmCanonPayload = {
@@ -280,7 +280,6 @@ export default function App() {
 
       try {
         const errorData = await res.json();
-        // If relay returns a clearer message, use it.
         const relayMsg =
           errorData?.message ||
           errorData?.error ||
@@ -289,7 +288,6 @@ export default function App() {
 
         if (relayMsg) errorMsg = relayMsg;
 
-        // if relay echoes requestId, add it
         if (errorData?.requestId) errorMsg += ` (requestId: ${errorData.requestId})`;
       } catch {
         const text = await res.text().catch(() => "");
@@ -300,7 +298,6 @@ export default function App() {
       throw new Error(errorMsg);
     }
 
-    // Prefer JSON response (relay should return requestId/status/timing)
     try {
       const out = await res.json();
       return { ok: true, ms, ...out };
@@ -358,11 +355,9 @@ export default function App() {
 
     setEmail(em);
 
-    // Generate code now (this is the code we will POST to CRM)
     const nextCode = accessCode || generateAccessCode();
     if (!accessCode) setAccessCode(nextCode);
 
-    // HARD RULE: do not proceed unless CRM POST actually fires
     setSendState("sending");
     setSendMsg("Sending your map delivery request...");
 
@@ -397,14 +392,11 @@ export default function App() {
     const entered = codeInput.trim().toUpperCase();
     if (!entered) return;
 
-    // If we have an expected code, enforce it.
     if (expected && entered !== expected) return;
 
-    // IMPORTANT: do not hard-navigate away (that is what causes “page 6” deployment/routing errors).
     goTo("info");
   }
 
-  // FINAL HANDOFF — this is the ONLY place we leave the .com funnel
   function openFullMapApp() {
     try {
       window.location.assign(FINAL_APP_URL);
@@ -1153,7 +1145,7 @@ export default function App() {
         }
       `}</style>
 
-      {/* Fatal runtime overlay (only shows if app actually mounts and then crashes) */}
+      {/* Fatal runtime overlay */}
       {fatalError ? (
         <div className="fatalOverlay" aria-label="App error overlay">
           <div className="fatalCard">
@@ -1196,7 +1188,9 @@ export default function App() {
               <strong>Are you ready to start decoding?</strong>
             </div>
 
-            <div className="sub">The Cipher shows the pattern. The Co-Pilot makes it simple. You take the next step with clear direction.</div>
+            <div className="sub">
+              The Cipher shows the pattern. The Co-Pilot makes it simple. You take the next step with clear direction.
+            </div>
 
             <button className="btn" type="button" onClick={goToDecode}>
               Start the private decode
@@ -1214,18 +1208,28 @@ export default function App() {
 
           <div className="p2Wrap">
             <div className="core" aria-label="Cipher core">
-              <img className="emblemLg" src="/brand/cipher-emblem.png" alt="BALANCE Cipher Core" loading="eager" style={{ opacity: 0.92 }} />
+              <img
+                className="emblemLg"
+                src="/brand/cipher-emblem.png"
+                alt="BALANCE Cipher Core"
+                loading="eager"
+                style={{ opacity: 0.92 }}
+              />
             </div>
 
             <div className="stage" aria-label="Cinematic sequence">
               <div className="title scene1Title">Cipher</div>
-              <div className="meaning scene1Mean">The first human intelligent device designed to crack the unbreakable codes.</div>
+              <div className="meaning scene1Mean">
+                The first human intelligent device designed to crack the unbreakable codes.
+              </div>
 
               <div className="title scene2Title">Co-Pilot + AI</div>
               <div className="meaning scene2Mean">AI. Built to complete once-impossible tasks in mere seconds.</div>
 
               <div className="title scene3Title">You</div>
-              <div className="meaning scene3Mean">You are the most powerful of all three, and designed and built for endless potential.</div>
+              <div className="meaning scene3Mean">
+                You are the most powerful of all three, and designed and built for endless potential.
+              </div>
 
               <div className="finalWrap" aria-label="Final equation">
                 <div className="finalRow" style={{ gap: 8 }}>
@@ -1351,7 +1355,13 @@ export default function App() {
         <main className="pX" aria-label="Private decode — Page 4">
           <div className="contentLayer">
             <div className="core coreSm" aria-label="Cipher core">
-              <img className="emblemLg emblemSm" src="/brand/cipher-emblem.png" alt="BALANCE Cipher Core" loading="eager" style={{ opacity: 0.9 }} />
+              <img
+                className="emblemLg emblemSm"
+                src="/brand/cipher-emblem.png"
+                alt="BALANCE Cipher Core"
+                loading="eager"
+                style={{ opacity: 0.9 }}
+              />
             </div>
 
             <div className="letterHeader" aria-label="Awakening header">
@@ -1398,7 +1408,13 @@ export default function App() {
         <main className="pX" aria-label="Private decode — Page 5">
           <div className="contentLayer">
             <div className="core coreSm" aria-label="Cipher core">
-              <img className="emblemLg emblemSm" src="/brand/cipher-emblem.png" alt="BALANCE Cipher Core" loading="eager" style={{ opacity: 0.88 }} />
+              <img
+                className="emblemLg emblemSm"
+                src="/brand/cipher-emblem.png"
+                alt="BALANCE Cipher Core"
+                loading="eager"
+                style={{ opacity: 0.88 }}
+              />
             </div>
 
             <div className="letterHeader" aria-label="Learning header">
@@ -1408,7 +1424,9 @@ export default function App() {
 
             {p5Stage === "email" ? (
               <>
-                <div className="breakTitle">Learning is where the Cipher starts learning you—so your map can finally fit your life.</div>
+                <div className="breakTitle">
+                  Learning is where the Cipher starts learning you—so your map can finally fit your life.
+                </div>
 
                 <div className="breakList" aria-label="Learning support bullets">
                   <div className="breakItem" style={{ ["--d" as any]: "120ms" }}>
@@ -1450,12 +1468,21 @@ export default function App() {
                     disabled={rewardOn || sendState === "sending"}
                   />
 
-                  <button className="btn btnWide" type="button" onClick={submitEmailFromP5} disabled={rewardOn || !canSubmitEmail || sendState === "sending"}>
+                  <button
+                    className="btn btnWide"
+                    type="button"
+                    onClick={submitEmailFromP5}
+                    disabled={rewardOn || !canSubmitEmail || sendState === "sending"}
+                  >
                     {sendState === "sending" ? "Sending..." : "Continue"}
                   </button>
 
                   {sendMsg ? (
-                    <div className={["sendStatus", sendState === "error" ? "sendStatusError" : "", sendState === "sent" ? "sendStatusGood" : ""].join(" ")}>
+                    <div
+                      className={["sendStatus", sendState === "error" ? "sendStatusError" : "", sendState === "sent" ? "sendStatusGood" : ""].join(
+                        " "
+                      )}
+                    >
                       {sendMsg}
                     </div>
                   ) : null}
@@ -1500,7 +1527,9 @@ export default function App() {
 
                 <div className="stepConfirm" style={{ marginTop: 14 }}>
                   Preview code (temporary):{" "}
-                  <strong style={{ fontWeight: 700, color: "rgba(255,255,255,0.92)" }}>{accessCode || "(generated after email entry)"}</strong>
+                  <strong style={{ fontWeight: 700, color: "rgba(255,255,255,0.92)" }}>
+                    {accessCode || "(generated after email entry)"}
+                  </strong>
                 </div>
               </>
             )}
@@ -1508,7 +1537,7 @@ export default function App() {
         </main>
       ) : null}
 
-      {/* PAGE 6 — INFO (final internal screen; CTA leaves .com) */}
+      {/* PAGE 6 — INFO */}
       {view === "info" ? (
         <main className="pX" aria-label="Private decode — Final screen">
           <div className="contentLayer">
@@ -1555,7 +1584,9 @@ export default function App() {
 
             <div className="stepConfirm" style={{ marginTop: 10 }}>
               Session data (temporary):{" "}
-              <strong style={{ fontWeight: 700, color: "rgba(255,255,255,0.92)" }}>{firstName ? `${firstName} ${lastName}`.trim() : "(name not captured)"}</strong>
+              <strong style={{ fontWeight: 700, color: "rgba(255,255,255,0.92)" }}>
+                {firstName ? `${firstName} ${lastName}`.trim() : "(name not captured)"}
+              </strong>
             </div>
           </div>
         </main>
