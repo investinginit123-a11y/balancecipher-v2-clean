@@ -1,25 +1,16 @@
 // /api/applications.js
-// Vercel Serverless Function (Node.js)
+// Vercel Serverless Function (CommonJS-safe)
 // Endpoint: POST /api/applications
-//
-// Env vars required (Vercel Project Settings):
-// - REPLIT_CRM_BASE_URL = https://crm.bastiansauto.com
-// - REPLIT_NP_API_KEY   = <your key>
-//
-// Optional debug:
-// - CRM_RELAY_DEBUG = true
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   const DEBUG = String(process.env.CRM_RELAY_DEBUG || "").toLowerCase() === "true";
 
-  // Basic CORS (safe default)
+  // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
+  if (req.method === "OPTIONS") return res.status(204).end();
 
   if (req.method !== "POST") {
     return res.status(405).json({
@@ -40,22 +31,16 @@ export default async function handler(req, res) {
         REPLIT_CRM_BASE_URL: !baseUrl,
         REPLIT_NP_API_KEY: !apiKey,
       },
-      ...(DEBUG ? { hint: "Set env vars in Vercel → Project → Settings → Environment Variables, then redeploy." } : {}),
+      ...(DEBUG ? { hint: "Set env vars in Vercel → Settings → Environment Variables, then redeploy." } : {}),
     });
   }
 
-  // Normalize base URL (no trailing slash)
   const normalizedBase = baseUrl.replace(/\/+$/, "");
   const targetUrl = `${normalizedBase}/api/applications`;
 
-  // Vercel automatically parses JSON body when Content-Type: application/json
-  // But we defensively handle string bodies as well.
   let incomingPayload = req.body;
-
   try {
-    if (typeof incomingPayload === "string") {
-      incomingPayload = JSON.parse(incomingPayload);
-    }
+    if (typeof incomingPayload === "string") incomingPayload = JSON.parse(incomingPayload);
   } catch (_e) {
     return res.status(400).json({
       ok: false,
@@ -64,10 +49,7 @@ export default async function handler(req, res) {
     });
   }
 
-  // Minimal shape validation (do NOT block real traffic—just sanity checks)
-  // Expecting: { source, requestId, startedAt, tracking, applicant: {...} }
   const hasApplicant = incomingPayload && typeof incomingPayload === "object" && incomingPayload.applicant;
-
   if (!hasApplicant) {
     return res.status(400).json({
       ok: false,
@@ -87,32 +69,17 @@ export default async function handler(req, res) {
     });
 
     const contentType = upstream.headers.get("content-type") || "";
-    let upstreamBody;
-
-    if (contentType.includes("application/json")) {
-      upstreamBody = await upstream.json();
-    } else {
-      upstreamBody = await upstream.text();
-    }
+    const upstreamBody = contentType.includes("application/json") ? await upstream.json() : await upstream.text();
 
     if (!upstream.ok) {
       return res.status(upstream.status).json({
         ok: false,
         error: "Upstream CRM rejected the request",
         status: upstream.status,
-        ...(DEBUG
-          ? {
-              targetUrl,
-              upstreamBody,
-              sentPayload: incomingPayload,
-            }
-          : {
-              upstreamBody: typeof upstreamBody === "string" ? upstreamBody.slice(0, 500) : upstreamBody,
-            }),
+        ...(DEBUG ? { targetUrl, upstreamBody, sentPayload: incomingPayload } : { upstreamBody }),
       });
     }
 
-    // Success
     return res.status(200).json({
       ok: true,
       message: "Relayed to CRM successfully",
@@ -125,5 +92,4 @@ export default async function handler(req, res) {
       ...(DEBUG ? { details: String(err), targetUrl } : {}),
     });
   }
-}
-
+};
