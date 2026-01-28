@@ -265,7 +265,7 @@ export default function App() {
   async function postToCrm(payload: CrmCanonPayload) {
     const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
 
-    const res = await fetch(RELAY_ROUTE, {
+   const RELAY_ROUTE = "/api/applications";
       method: "POST",
       headers: {
         "Content-Type": "application/json",
