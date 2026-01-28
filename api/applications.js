@@ -1,95 +1,72 @@
-// /api/applications.js
-// Vercel Serverless Function (CommonJS-safe)
-// Endpoint: POST /api/applications
-
-module.exports = async function handler(req, res) {
-  const DEBUG = String(process.env.CRM_RELAY_DEBUG || "").toLowerCase() === "true";
-
-  // CORS
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-  if (req.method === "OPTIONS") return res.status(204).end();
-
+export default async function handler(req, res) {
+  // Allow only POST
   if (req.method !== "POST") {
-    return res.status(405).json({
-      ok: false,
-      error: "Method Not Allowed",
-      allowed: ["POST"],
-    });
+    return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
-  const baseUrl = (process.env.REPLIT_CRM_BASE_URL || "").trim();
-  const apiKey = (process.env.REPLIT_NP_API_KEY || "").trim();
+  const baseUrl = process.env.REPLIT_CRM_BASE_URL;
+  const apiKey = process.env.REPLIT_NP_API_KEY;
+  const debug = String(process.env.CRM_RELAY_DEBUG || "").toLowerCase() === "true";
 
   if (!baseUrl || !apiKey) {
     return res.status(500).json({
       ok: false,
-      error: "Missing required environment variables",
-      missing: {
-        REPLIT_CRM_BASE_URL: !baseUrl,
-        REPLIT_NP_API_KEY: !apiKey,
-      },
-      ...(DEBUG ? { hint: "Set env vars in Vercel → Settings → Environment Variables, then redeploy." } : {}),
+      error: "Missing REPLIT_CRM_BASE_URL or REPLIT_NP_API_KEY",
+      debug: debug
+        ? { hasBaseUrl: Boolean(baseUrl), hasApiKey: Boolean(apiKey) }
+        : undefined
     });
   }
 
-  const normalizedBase = baseUrl.replace(/\/+$/, "");
-  const targetUrl = `${normalizedBase}/api/applications`;
-
-  let incomingPayload = req.body;
-  try {
-    if (typeof incomingPayload === "string") incomingPayload = JSON.parse(incomingPayload);
-  } catch (_e) {
-    return res.status(400).json({
-      ok: false,
-      error: "Invalid JSON payload",
-      ...(DEBUG ? { receivedType: typeof req.body, receivedBody: req.body } : {}),
-    });
-  }
-
-  const hasApplicant = incomingPayload && typeof incomingPayload === "object" && incomingPayload.applicant;
-  if (!hasApplicant) {
-    return res.status(400).json({
-      ok: false,
-      error: "Payload missing required 'applicant' object",
-      ...(DEBUG ? { receivedPayload: incomingPayload } : {}),
-    });
+  // Vercel may provide req.body as object OR string depending on runtime/config.
+  let body = req.body;
+  if (typeof body === "string") {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      // keep as string
+    }
   }
 
   try {
-    const upstream = await fetch(targetUrl, {
+    const upstreamUrl = `${baseUrl.replace(/\/$/, "")}/api/applications`;
+
+    const upstream = await fetch(upstreamUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-API-Key": apiKey,
+        "X-API-Key": apiKey
       },
-      body: JSON.stringify(incomingPayload),
+      body: JSON.stringify(body ?? {})
     });
 
-    const contentType = upstream.headers.get("content-type") || "";
-    const upstreamBody = contentType.includes("application/json") ? await upstream.json() : await upstream.text();
+    const raw = await upstream.text();
+    let parsed = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = { raw };
+    }
 
     if (!upstream.ok) {
-      return res.status(upstream.status).json({
+      return res.status(502).json({
         ok: false,
-        error: "Upstream CRM rejected the request",
-        status: upstream.status,
-        ...(DEBUG ? { targetUrl, upstreamBody, sentPayload: incomingPayload } : { upstreamBody }),
+        upstreamStatus: upstream.status,
+        upstreamBody: parsed,
+        debug: debug ? { upstreamUrl } : undefined
       });
     }
 
     return res.status(200).json({
       ok: true,
-      message: "Relayed to CRM successfully",
-      ...(DEBUG ? { targetUrl, upstreamBody } : {}),
+      upstream: parsed,
+      debug: debug ? { upstreamUrl } : undefined
     });
-  } catch (err) {
+  } catch (e) {
     return res.status(500).json({
       ok: false,
-      error: "Relay failed (network/runtime error)",
-      ...(DEBUG ? { details: String(err), targetUrl } : {}),
+      error: e?.message || "Unexpected error",
+      debug: debug ? { stack: e?.stack } : undefined
     });
   }
-};
+}
