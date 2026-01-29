@@ -1,13 +1,14 @@
 export default async function handler(req, res) {
+  // Only allow POST
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
   const baseUrl = process.env.REPLIT_CRM_BASE_URL;
   const apiKey = process.env.REPLIT_NP_API_KEY;
-  const debug = process.env.CRM_RELAY_DEBUG === "true";
+  const debugOn = process.env.CRM_RELAY_DEBUG === "true";
 
-  const safeDebug = debug
+  const safeDebug = debugOn
     ? {
         hasBaseUrl: !!baseUrl,
         hasApiKey: !!apiKey,
@@ -26,12 +27,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const upstream = await fetch(`${baseUrl.replace(/\/$/, "")}/api/applications`, {
+    const upstreamUrl = `${baseUrl.replace(/\/$/, "")}/api/applications`;
+
+    const upstream = await fetch(upstreamUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        // CRITICAL: send ONLY ONE API key header (case-insensitive systems may merge duplicates)
         "X-API-Key": apiKey,
-        "X-API-KEY": apiKey,
       },
       body: JSON.stringify(req.body),
     });
@@ -50,7 +53,7 @@ export default async function handler(req, res) {
         message: "Upstream CRM returned non-OK response",
         upstreamStatus: upstream.status,
         upstreamBody: parsed,
-        upstreamUrl: `${baseUrl.replace(/\/$/, "")}/api/applications`,
+        upstreamUrl,
         ...(safeDebug ? { debug: safeDebug } : {}),
       });
     }
