@@ -7,13 +7,13 @@ export default async function handler(req, res) {
   const apiKey = process.env.REPLIT_NP_API_KEY;
   const debug = process.env.CRM_RELAY_DEBUG === "true";
 
-  // SAFE debug (no full secrets)
-  const debugInfo = debug
+  const safeDebug = debug
     ? {
         hasBaseUrl: !!baseUrl,
         hasApiKey: !!apiKey,
         apiKeyLen: apiKey ? String(apiKey).length : 0,
         apiKeyLast4: apiKey ? String(apiKey).slice(-4) : "",
+        apiKeyPrefix8: apiKey ? String(apiKey).slice(0, 8) : "",
       }
     : undefined;
 
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     return res.status(500).json({
       ok: false,
       error: "Missing REPLIT_CRM_BASE_URL or REPLIT_NP_API_KEY",
-      ...(debugInfo ? { debug: debugInfo } : {}),
+      ...(safeDebug ? { debug: safeDebug } : {}),
     });
   }
 
@@ -30,7 +30,6 @@ export default async function handler(req, res) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        // keep BOTH variants to eliminate header-name weirdness
         "X-API-Key": apiKey,
         "X-API-KEY": apiKey,
       },
@@ -52,20 +51,20 @@ export default async function handler(req, res) {
         upstreamStatus: upstream.status,
         upstreamBody: parsed,
         upstreamUrl: `${baseUrl.replace(/\/$/, "")}/api/applications`,
-        ...(debugInfo ? { debug: debugInfo } : {}),
+        ...(safeDebug ? { debug: safeDebug } : {}),
       });
     }
 
     return res.status(200).json({
       ok: true,
       upstream: parsed,
-      ...(debugInfo ? { debug: debugInfo } : {}),
+      ...(safeDebug ? { debug: safeDebug } : {}),
     });
   } catch (e) {
     return res.status(500).json({
       ok: false,
       error: e?.message || "Unexpected error",
-      ...(debugInfo ? { debug: debugInfo } : {}),
+      ...(safeDebug ? { debug: safeDebug } : {}),
     });
   }
 }
