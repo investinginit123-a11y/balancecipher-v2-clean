@@ -5,11 +5,23 @@ export default async function handler(req, res) {
 
   const baseUrl = process.env.REPLIT_CRM_BASE_URL;
   const apiKey = process.env.REPLIT_NP_API_KEY;
+  const debug = process.env.CRM_RELAY_DEBUG === "true";
+
+  // SAFE debug (no full secrets)
+  const debugInfo = debug
+    ? {
+        hasBaseUrl: !!baseUrl,
+        hasApiKey: !!apiKey,
+        apiKeyLen: apiKey ? String(apiKey).length : 0,
+        apiKeyLast4: apiKey ? String(apiKey).slice(-4) : "",
+      }
+    : undefined;
 
   if (!baseUrl || !apiKey) {
     return res.status(500).json({
       ok: false,
       error: "Missing REPLIT_CRM_BASE_URL or REPLIT_NP_API_KEY",
+      ...(debugInfo ? { debug: debugInfo } : {}),
     });
   }
 
@@ -18,7 +30,8 @@ export default async function handler(req, res) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        // IMPORTANT: match CRM header name exactly
+        // keep BOTH variants to eliminate header-name weirdness
+        "X-API-Key": apiKey,
         "X-API-KEY": apiKey,
       },
       body: JSON.stringify(req.body),
@@ -39,11 +52,20 @@ export default async function handler(req, res) {
         upstreamStatus: upstream.status,
         upstreamBody: parsed,
         upstreamUrl: `${baseUrl.replace(/\/$/, "")}/api/applications`,
+        ...(debugInfo ? { debug: debugInfo } : {}),
       });
     }
 
-    return res.status(200).json({ ok: true, upstream: parsed });
+    return res.status(200).json({
+      ok: true,
+      upstream: parsed,
+      ...(debugInfo ? { debug: debugInfo } : {}),
+    });
   } catch (e) {
-    return res.status(500).json({ ok: false, error: e?.message || "Unexpected error" });
+    return res.status(500).json({
+      ok: false,
+      error: e?.message || "Unexpected error",
+      ...(debugInfo ? { debug: debugInfo } : {}),
+    });
   }
 }
